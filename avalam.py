@@ -1,6 +1,7 @@
 import numpy as np
 import asyncio
 import websockets
+import random
 import json
 
 
@@ -80,6 +81,25 @@ def apply_move(board_pieces, move):
     return board_pieces
 
 
+def naive_player(board_pieces):
+    legal_moves = get_legal_moves(board_pieces)
+    current_scores = get_scores(board_pieces)
+    best_score_diff = 0
+    best_move = None
+    if not legal_moves:
+        return None
+    for move1 in legal_moves:
+        new_board1 = apply_move(board_pieces.copy(), move1)
+        new_scores = get_scores(new_board1)
+        score_diff = (new_scores[0] - current_scores[0]) - (new_scores[1] - current_scores[1])
+        if score_diff > best_score_diff:
+            best_move = move1
+            best_score_diff = score_diff
+    if best_move is not None:
+        return best_move
+    return random.choice(legal_moves)
+
+
 async def handler(websocket):
     try:
         board_pieces = init_board_pieces()
@@ -95,7 +115,12 @@ async def handler(websocket):
             if suggested_move in legal_moves:
                 board_pieces = apply_move(board_pieces, suggested_move)
                 await websocket.send(board_pieces_json(board_pieces))
+                ai_move = naive_player(board_pieces)
+                if ai_move:
+                    board_pieces = apply_move(board_pieces, ai_move)
+                    await websocket.send(board_pieces_json(board_pieces))
                 legal_moves = get_legal_moves(board_pieces)
+
             else:
                 await websocket.send(json.dumps({"error": f"Illegal move {str(suggested_move)}"}))
 
